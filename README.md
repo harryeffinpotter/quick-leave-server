@@ -1,3 +1,5 @@
+![QuickLeaveServer](https://github.com/user-attachments/assets/494d2c65-ff85-4a38-a7d5-eaa7092c14ed)
+
 # QuickLeaveServer
 
 A BetterDiscord plugin that allows you to quickly leave Discord servers with customizable keyboard and mouse combinations.
