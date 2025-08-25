@@ -42,7 +42,7 @@ module.exports = class QuickLeaveServer {
       keys: ["Backspace"],
       mouseButton: 0, // 0=left, 1=middle, 2=right
       requireConfirmation: false,
-      showWarning: true
+      showFirstRunConfirmation: true
     };
     
     try {
@@ -157,16 +157,7 @@ module.exports = class QuickLeaveServer {
     let tempSettings = Object.assign({}, this.settings);
     
     panel.innerHTML = `
-      <div style="margin-bottom: 20px; padding: 12px; background: rgba(240, 71, 71, 0.1); border: 1px solid rgba(240, 71, 71, 0.3); border-radius: 5px;">
-        <h3 style="color: #f04747; margin-top: 0; margin-bottom: 8px;">⚠️ Warning</h3>
-        <p style="margin: 8px 0; color: #dcddde; line-height: 1.4;">Leaving many servers rapidly may trigger Discord's anti-hijacking protection system. This could result in:</p>
-        <ul style="margin: 8px 0 8px 20px; color: #dcddde; line-height: 1.4;">
-          <li>Temporary account restrictions</li>
-          <li>Verification requirements</li>
-          <li>In extreme cases, account suspension</li>
-        </ul>
-        <p style="margin: 8px 0; color: #dcddde;"><strong style="color: #5865F2;">Your mileage may vary</strong> - some users report no issues after leaving 30+ servers, while others have experienced restrictions with fewer.</p>
-      </div>
+
       
       <div style="margin-bottom: 20px;">
         <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #ffffff; font-size: 16px;">Hotkey Configuration</label>
@@ -203,23 +194,30 @@ module.exports = class QuickLeaveServer {
       <div style="margin-bottom: 15px;">
         <label style="display: flex; align-items: center; cursor: pointer; color: #dcddde;">
           <input type="checkbox" id="qls-require-confirmation" ${this.settings.requireConfirmation ? "checked" : ""} style="margin-right: 8px;">
-          <span>Require confirmation before leaving (adds safety but slows down the process)</span>
+          <span>Always require confirmation before leaving</span>
         </label>
         <div style="margin-top: 5px; margin-left: 23px; font-size: 12px; color: #8e9297;">
-          When enabled, shows a confirmation dialog before leaving each server
+          When enabled, always shows a confirmation dialog before leaving each server
         </div>
       </div>
       
       <div style="margin-bottom: 20px;">
         <label style="display: flex; align-items: center; cursor: pointer; color: #dcddde;">
-          <input type="checkbox" id="qls-show-warning" ${this.settings.showWarning ? "checked" : ""} style="margin-right: 8px;">
-          <span>Show warning on plugin start</span>
+          <input type="checkbox" id="qls-show-first-run" ${this.settings.showFirstRunConfirmation ? "checked" : ""} style="margin-right: 8px;">
+          <span>Show confirmation on first/next use</span>
         </label>
+        <div style="margin-top: 5px; margin-left: 23px; font-size: 12px; color: #8e9297;">
+          Shows confirmation on next use
+        </div>
       </div>
-      
-      <button id="qls-save" style="padding: 10px 24px; background: #3BA55C; color: white; border: none; border-radius: 3px; cursor: pointer; font-weight: 500; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#2D7D46'" onmouseout="this.style.background='#3BA55C'">
-        ✓ Save Settings
-      </button>
+	  <div style="margin-bottom: 20px; padding: 12px; background: rgba(240, 71, 71, 0.1); border: 1px solid rgba(240, 71, 71, 0.3); border-radius: 5px;">
+        <h3 style="color: #f04747; margin-top: 0; margin-bottom: 8px;">⚠️ Warning</h3>
+        <p style="margin: 8px 0; color: #dcddde; line-height: 1.4;">In rare cases leaving many (20+) servers rapidly (within a minute) may trigger Discord's anti-hijacking protection system. This could result in:</p>
+        <ul style="margin: 8px 0 8px 20px; color: #dcddde; line-height: 1.4;">
+          <li>Temporary account restrictions</li>
+          <li>Verification requirements</li>
+        </ul>
+      </div>
     `;
     
     const recordBtn = panel.querySelector("#qls-record");
@@ -258,7 +256,11 @@ module.exports = class QuickLeaveServer {
           tempSettings.mouseButton = this.recordedMouseButton;
         }
         currentHotkeyDiv.textContent = updateTempKeybind();
-        BdApi.UI.showToast("Hotkey recorded! Click 'Save Settings' to apply.", { type: "info" });
+        // Save immediately
+        this.settings.keys = tempSettings.keys;
+        this.settings.mouseButton = tempSettings.mouseButton;
+        this.saveSettings();
+        BdApi.UI.showToast("Hotkey saved!", { type: "success" });
       }
       
       this.recordedKeys.clear();
@@ -271,15 +273,22 @@ module.exports = class QuickLeaveServer {
       tempSettings.keys = ["Backspace"];
       tempSettings.mouseButton = 0;
       currentHotkeyDiv.textContent = updateTempKeybind();
-      BdApi.UI.showToast("Reset to default! Click 'Save Settings' to apply.", { type: "info" });
-    };
-    
-    panel.querySelector("#qls-save").onclick = () => {
-      // Save all settings including the temporary hotkey changes
+      // Save immediately
       this.settings.keys = tempSettings.keys;
       this.settings.mouseButton = tempSettings.mouseButton;
-      this.settings.requireConfirmation = panel.querySelector("#qls-require-confirmation").checked;
-      this.settings.showWarning = panel.querySelector("#qls-show-warning").checked;
+      this.saveSettings();
+      BdApi.UI.showToast("Reset to default!", { type: "success" });
+    };
+    
+    // Auto-save checkbox changes
+    panel.querySelector("#qls-require-confirmation").onchange = (e) => {
+      this.settings.requireConfirmation = e.target.checked;
+      this.saveSettings();
+      BdApi.UI.showToast("Settings saved!", { type: "success" });
+    };
+    
+    panel.querySelector("#qls-show-first-run").onchange = (e) => {
+      this.settings.showFirstRunConfirmation = e.target.checked;
       this.saveSettings();
       BdApi.UI.showToast("Settings saved!", { type: "success" });
     };
@@ -475,20 +484,47 @@ module.exports = class QuickLeaveServer {
     event.stopPropagation();
     
     // Show confirmation if enabled (with don't show again option on first use)
-    if (this.settings.requireConfirmation || this.settings.showWarning) {
-      const guildStore = BdApi.findModuleByProps("getGuild");
-      const guild = guildStore ? guildStore.getGuild(guildId) : null;
-      const guildName = guild ? guild.name : "this server";
+    if (this.settings.requireConfirmation || this.settings.showFirstRunConfirmation) {
+      // Try multiple methods to get the guild name
+      let guildName = "this server";
       
-      const result = await this.showLeaveConfirmation(guildName, this.settings.showWarning);
+      // Method 1: Try BdApi Webpack modules
+      const guildStore = BdApi.Webpack.getModule(m => m.getGuild && m.getGuilds) || 
+                        BdApi.findModuleByProps("getGuild", "getGuilds");
+      
+      if (guildStore && guildStore.getGuild) {
+        const guild = guildStore.getGuild(guildId);
+        if (guild && guild.name) {
+          guildName = guild.name;
+        }
+      }
+      
+      // Method 2: If that fails, try to get it from the DOM element
+      if (guildName === "this server") {
+        const guildElement = document.querySelector(`[data-list-item-id*="${guildId}"] [aria-label]`);
+        if (guildElement) {
+          const ariaLabel = guildElement.getAttribute("aria-label");
+          if (ariaLabel) {
+            guildName = ariaLabel;
+          }
+        }
+      }
+      
+      // Only show checkbox if requireConfirmation is false (first run scenario)
+      const showCheckbox = !this.settings.requireConfirmation && this.settings.showFirstRunConfirmation;
+      const result = await this.showLeaveConfirmation(guildName, showCheckbox);
       
       if (result === "cancel") return;
       
       if (result === "never") {
+        // User checked "Don't show again" - disable first run confirmation
         this.settings.requireConfirmation = false;
-        this.settings.showWarning = false;
+        this.settings.showFirstRunConfirmation = false;
         this.saveSettings();
       }
+      // If result is "confirm", user either:
+      // 1. Unchecked "Don't show again" - keep showFirstRunConfirmation true
+      // 2. Or requireConfirmation is true (no checkbox shown) - keep settings as is
     }
     
     console.log('[QuickLeaveServer] leaving server:', guildId);
@@ -535,7 +571,9 @@ module.exports = class QuickLeaveServer {
       
       const content = React.createElement("div", {},
         React.createElement("p", { style: { marginBottom: showCheckbox ? "15px" : "0", color: "#dcddde" } },
-          `Are you sure you want to leave "${serverName}"?`
+          serverName === "this server" 
+            ? "Are you sure you want to leave this server?" 
+            : `Are you sure you want to leave "${serverName}"?`
         ),
         showCheckbox && React.createElement("label", { 
           style: { 
@@ -564,9 +602,11 @@ module.exports = class QuickLeaveServer {
           cancelText: "No",
           danger: true,
           onConfirm: () => {
-            if (dontShowAgain && showCheckbox) {
+            // Only return "never" if checkbox is shown AND checked
+            if (showCheckbox && dontShowAgain) {
               resolve("never");
             } else {
+              // Either checkbox not shown, or user unchecked it
               resolve("confirm");
             }
           },

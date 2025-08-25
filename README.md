@@ -42,8 +42,8 @@ After installing the plugin, you can configure it in the plugin settings:
 ## Default Settings
 
 By default, the plugin uses:
-- **Keys**: Ctrl + Shift
-- **Mouse Button**: Right-click
+- **Keys**: Backspace
+- **Mouse Button**: Left-click
 
 You can change these settings at any time through the plugin configuration.
 
