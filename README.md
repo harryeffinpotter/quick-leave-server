@@ -4,7 +4,7 @@ A BetterDiscord plugin that allows you to quickly leave Discord servers with cus
 
 ## Installation
 
-1. Download the [`QuickLeaveServer.plugin.js`](https://github.com/harryeffinpotter/quick-leave-server/blob/master/QuickLeaveServer.plugin.js) file
+1. Download the [`QuickLeaveServer.plugin.js`](https://github.com/harryeffinpotter/quick-leave-server/raw/refs/heads/master/QuickLeaveServer.plugin.js) file
 2. Place it in your BetterDiscord plugins directory:
    - **Windows**: `%appdata%\BetterDiscord\plugins\`
    - **macOS**: `~/Library/Application Support/BetterDiscord/plugins/`
